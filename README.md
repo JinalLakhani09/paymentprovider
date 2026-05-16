@@ -26,13 +26,38 @@ The system is built using a modular architecture to enforce clear separation of 
 
 ## Database Design
 
-### 1. Users Table
+The system uses PostgreSQL with TypeORM. The schema consists of three main tables:
+
+### 1. Users Table (`users`)
 Stores the registered users of the system.
 - `id` (UUID, Primary Key)
 - `email` (VARCHAR, Unique)
 - `passwordHash` (VARCHAR, stored securely via bcrypt)
 - `createdAt` (TIMESTAMP)
 - `updatedAt` (TIMESTAMP)
+
+### 2. Cards Table (`cards`)
+Stores tokenized and encrypted credit card information for PCI-DSS compliance.
+- `id` (UUID, Primary Key)
+- `userId` (UUID, Foreign Key to Users)
+- `encryptedPan` (VARCHAR, AES-256-GCM encrypted card number)
+- `token` (UUID, Unique, the safe token used for payments)
+- `last4` (VARCHAR, last 4 digits for UI display)
+- `createdAt` (TIMESTAMP)
+
+### 3. Payments Table (`payments`)
+Acts as the ledger and state machine for all transactions.
+- `id` (UUID, Primary Key)
+- `userId` (UUID, Foreign Key to Users)
+- `cardToken` (UUID, Foreign Key to Cards.token)
+- `amount` (DECIMAL 10,2)
+- `idempotencyKey` (VARCHAR, Unique constraint to prevent duplicate charges)
+- `status` (ENUM: INITIATED, PROCESSING, AUTHORIZED, CAPTURED, FAILED, RETRYING)
+- `durationMs` (INTEGER, execution time for metrics)
+- `errorCode` / `errorMessage` (VARCHAR, populated on failure)
+- `authorizationCode` (VARCHAR, populated on success)
+- `history` (JSONB, audit trail of state changes and retry attempts)
+- `createdAt` / `updatedAt` (TIMESTAMP)
 
 ---
 
@@ -42,8 +67,8 @@ Stores the registered users of the system.
 - Node.js (v18+)
 - Docker Desktop
 
-### 1. Start the Database
-The project includes a `docker-compose.yml` to easily spin up PostgreSQL.
+### 1. Start the Database (Required on Project Load)
+The project includes a `docker-compose.yml` to easily spin up PostgreSQL. **You must run this command every time you load the project or restart your computer** to ensure the database is running before starting the application.
 ```bash
 docker-compose up -d
 ```
